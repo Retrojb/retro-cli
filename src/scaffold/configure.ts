@@ -26,7 +26,14 @@ export async function configureProject(config: ScaffoldConfig): Promise<void> {
   }
 
   // 3. Parse and update the name field
-  const packageJson = JSON.parse(packageJsonContent);
+  let packageJson: any;
+  try {
+    packageJson = JSON.parse(packageJsonContent);
+  } catch (err) {
+    throw new ScaffoldError(
+      `Failed to parse package.json: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
   packageJson.name = config.projectName;
 
   // 4. If Jest selected: add jest config and devDependency

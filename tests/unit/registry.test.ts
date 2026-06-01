@@ -70,9 +70,9 @@ describe('Template Registry', () => {
   });
 
   describe('getAvailableOptions', () => {
-    it('returns both additional options', () => {
+    it('returns all additional options', () => {
       const options = getAvailableOptions();
-      expect(options).toHaveLength(2);
+      expect(options).toHaveLength(3);
     });
 
     it('includes Jest option with correct data', () => {

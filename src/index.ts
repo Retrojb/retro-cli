@@ -7,6 +7,7 @@ import { promptProjectName } from './prompts/projectName.js';
 import { promptTemplateSelection } from './prompts/templateSelect.js';
 import { promptAdditionalOptions } from './prompts/options.js';
 import { getAvailableTemplates, getAvailableOptions } from './templates/registry.js';
+import { shouldPromptScaffoldMethod, promptScaffoldMethod } from './prompts/scaffoldMethod.js';
 import { cloneTemplate } from './scaffold/clone.js';
 import { runInteractiveCli } from './scaffold/interactive.js';
 import { configureProject } from './scaffold/configure.js';
@@ -52,11 +53,21 @@ program
         targetDir,
       };
 
-      // 6. Clone template
-      await cloneTemplate(config);
+      // 6. Determine scaffolding method
+      let scaffoldMethod: 'repo' | 'cli' = 'repo';
+      if (shouldPromptScaffoldMethod(template)) {
+        scaffoldMethod = await promptScaffoldMethod(template);
+      }
 
-      // 7. Run interactive CLI (if template defines one)
-      await runInteractiveCli(config);
+      // 7. Execute scaffolding based on method
+      if (scaffoldMethod === 'cli') {
+        // Framework CLI path: skip clone, run CLI directly
+        await runInteractiveCli(config);
+      } else {
+        // Repo path (or no cliCommand): clone then run interactive CLI
+        await cloneTemplate(config);
+        await runInteractiveCli(config);
+      }
 
       // 8. Configure project
       await configureProject(config);

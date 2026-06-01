@@ -1,5 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fc from 'fast-check';
+import { ScaffoldConfig, ScaffoldError } from '../../src/types.js';
+
+// Mock node:fs/promises for Property 3
+vi.mock('node:fs/promises', () => ({
+  default: {
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    rm: vi.fn(),
+  },
+}));
+
+import fs from 'node:fs/promises';
+import { configureProject } from '../../src/scaffold/configure.js';
+
+const mockedFs = vi.mocked(fs);
 
 // Feature: template-cli, Property 5: Package.json name update preserves structure
 
@@ -56,6 +71,72 @@ describe('Package.json name update properties', () => {
         expect(reparsed.devDependencies).toEqual(originalPkg.devDependencies);
       }),
       { numRuns: 100 }
+    );
+  });
+});
+
+// Feature: framework-cli-scaffolding, Property 3: Malformed JSON in package.json produces an error
+
+describe('Malformed package.json error handling properties', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  /**
+   * Property 3: Malformed JSON in package.json produces an error
+   *
+   * For any string that is not valid JSON, if that string is the content of
+   * package.json in the target directory, configureProject SHALL throw a
+   * ScaffoldError without modifying the project directory.
+   *
+   * **Validates: Requirements 4.4**
+   */
+  it('Property 3: malformed JSON in package.json throws ScaffoldError', async () => {
+    // Arbitrary that generates strings which are NOT valid JSON
+    const nonJsonStringArb = fc
+      .string({ minLength: 1, maxLength: 500 })
+      .filter((s) => {
+        try {
+          JSON.parse(s);
+          return false; // valid JSON, exclude it
+        } catch {
+          return true; // invalid JSON, include it
+        }
+      });
+
+    const configArb = fc.record({
+      projectName: fc.stringMatching(/^[a-z][a-z0-9\-]{0,20}$/).filter((s) => s.length > 0),
+      targetDir: fc.constant('/tmp/test-project'),
+    });
+
+    await fc.assert(
+      fc.asyncProperty(nonJsonStringArb, configArb, async (malformedJson, configParts) => {
+        const config: ScaffoldConfig = {
+          projectName: configParts.projectName,
+          template: {
+            name: 'test-template',
+            displayName: 'Test Template',
+            description: 'A test template',
+            repoUrl: 'https://example.com/repo.git',
+          },
+          additionalOptions: [],
+          targetDir: configParts.targetDir,
+        };
+
+        // Mock fs.readFile to return the malformed JSON string
+        mockedFs.readFile.mockResolvedValue(malformedJson);
+        // Mock fs.writeFile and fs.rm to ensure no modifications happen
+        mockedFs.writeFile.mockResolvedValue(undefined);
+        mockedFs.rm.mockResolvedValue(undefined);
+
+        // configureProject should throw a ScaffoldError
+        await expect(configureProject(config)).rejects.toThrow(ScaffoldError);
+
+        // Verify no write operations occurred (project directory not modified)
+        expect(mockedFs.writeFile).not.toHaveBeenCalled();
+        expect(mockedFs.rm).not.toHaveBeenCalled();
+      }),
+      { numRuns: 100 },
     );
   });
 });

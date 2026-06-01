@@ -42,6 +42,11 @@ const additionalOptions: AdditionalOption[] = [
     displayName: 'ESLint',
     description: 'ESLint linting configuration',
   },
+  {
+    name: 'prettier',
+    displayName: "Prettier",
+    description: "prettier configuration"
+  }
 ];
 
 export function getAvailableTemplates(): Template[] {
